@@ -38,7 +38,8 @@ const dom = {
     detailPanel: document.getElementById('detailPanel'),
     detailContent: document.getElementById('detailContent'),
     closeDetailButton: document.getElementById('closeDetailButton'),
-    openDetailUrlButton: document.getElementById('openDetailUrlButton')
+    openDetailUrlButton: document.getElementById('openDetailUrlButton'),
+    openMapButton: document.getElementById('openMapButton')
 };
 
 /* ===========================
@@ -403,6 +404,8 @@ function renderDetailPanel() {
         dom.contentWrapper.classList.remove('detail-open');
         dom.openDetailUrlButton.classList.add('hidden');
         dom.openDetailUrlButton.setAttribute('href', '#');
+        dom.openMapButton.classList.add('hidden');
+        dom.openMapButton.setAttribute('href', '#');
         return;
     }
 
@@ -410,6 +413,15 @@ function renderDetailPanel() {
     dom.contentWrapper.classList.add('detail-open');
     const item = appState.selectedItem;
     const itemUrl = getItemUrl(item);
+    const mapUrl = getGoogleMapsSearchUrl(item);
+
+    if (mapUrl) {
+        dom.openMapButton.classList.remove('hidden');
+        dom.openMapButton.setAttribute('href', mapUrl);
+    } else {
+        dom.openMapButton.classList.add('hidden');
+        dom.openMapButton.setAttribute('href', '#');
+    }
 
     if (itemUrl) {
         dom.openDetailUrlButton.classList.remove('hidden');
@@ -551,6 +563,21 @@ function getItemUrl(item) {
     }
 
     return trimmedUrl;
+}
+
+/**
+ * Build Google Maps search URL from address and suburb fields.
+ */
+function getGoogleMapsSearchUrl(item) {
+    const address = (item.Address || item.address || '').toString().trim();
+    const suburb = (item.Suburb || item.suburb || '').toString().trim();
+    const query = [address, suburb].filter(Boolean).join(', ');
+
+    if (!query) {
+        return '';
+    }
+
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
 /**
