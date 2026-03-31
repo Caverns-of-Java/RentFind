@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RentFind</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>RentFind</h1>
+        </header>
+
+        <!-- Status/State Region -->
+        <div class="status-region">
+            <!-- Loading State -->
+            <div id="loadingState" class="state-box loading-state hidden">
+                <div class="spinner"></div>
+                <p>Loading data...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="state-box error-state hidden">
+                <p class="error-message" id="errorMessage">Failed to load data.</p>
+                <button id="retryButton" class="btn btn-primary">Retry</button>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="state-box empty-state hidden">
+                <p>No results found.</p>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content-wrapper">
+            <!-- List View -->
+            <div class="list-container">
+                <div id="listView" class="list-view hidden">
+                    <ul id="itemList" class="item-list"></ul>
+                </div>
+            </div>
+
+            <!-- Detail Panel (Mobile Slide-Up / Desktop Side Panel) -->
+            <div id="detailPanel" class="detail-panel hidden">
+                <div class="detail-header">
+                    <button id="closeDetailButton" class="btn-close" aria-label="Close detail">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <div id="detailContent" class="detail-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
