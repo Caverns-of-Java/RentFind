@@ -12,7 +12,8 @@ const appState = {
     items: [],
     selectedItem: null,
     isLoading: false,
-    error: null
+    error: null,
+    viewMode: 'default'
 };
 
 /* ===========================
@@ -31,6 +32,7 @@ const dom = {
     contentWrapper: document.querySelector('.content-wrapper'),
     listView: document.getElementById('listView'),
     itemList: document.getElementById('itemList'),
+    viewModeRadios: Array.from(document.querySelectorAll('input[name="viewMode"]')),
 
     // Detail panel
     detailPanel: document.getElementById('detailPanel'),
@@ -96,9 +98,24 @@ function deselectItem() {
  * Main render function - reflects app state to UI
  */
 function render() {
+    renderHeaderControls();
     renderStateRegion();
     renderListView();
+
+    if (appState.selectedItem && !getVisibleItems().includes(appState.selectedItem)) {
+        appState.selectedItem = null;
+    }
+
     renderDetailPanel();
+}
+
+/**
+ * Sync header toggles with app state.
+ */
+function renderHeaderControls() {
+    dom.viewModeRadios.forEach((radio) => {
+        radio.checked = radio.value === appState.viewMode;
+    });
 }
 
 /**
@@ -117,7 +134,7 @@ function renderStateRegion() {
     } else if (appState.error) {
         dom.errorMessage.textContent = appState.error;
         dom.errorState.classList.remove('hidden');
-    } else if (appState.items.length === 0) {
+    } else if (getVisibleItems().length === 0) {
         dom.emptyState.classList.remove('hidden');
     } else {
         dom.statusRegion.classList.add('hidden');
@@ -128,7 +145,7 @@ function renderStateRegion() {
  * Render list of items
  */
 function renderListView() {
-    if (appState.isLoading || appState.error || appState.items.length === 0) {
+    if (appState.isLoading || appState.error || getVisibleItems().length === 0) {
         dom.listView.classList.add('hidden');
         return;
     }
@@ -136,92 +153,106 @@ function renderListView() {
     dom.listView.classList.remove('hidden');
     dom.itemList.innerHTML = '';
 
-    // Sort by inspection time (earliest first)
-    const sortedItems = [...appState.items].sort((a, b) => {
-        const timeA = getNextInspectionTime(a.DateInspectTime);
-        const timeB = getNextInspectionTime(b.DateInspectTime);
-        
-        // Items without valid times go to end
-        if (!timeA) return 1;
-        if (!timeB) return -1;
-        
-        return timeA - timeB;
-    });
+    const currentView = getCurrentView();
 
-    // Categorize into sections
-    const sections = categorizeSections(sortedItems);
+    if (currentView === 'planned') {
+        const sections = buildUpcomingAndShortlistSections(getVisibleItems());
+        renderSection('Upcoming', sections.next, 'next-section');
+        renderSection('Shortlist', sections.shortlist, 'upcoming-section');
+        return;
+    }
 
-    // Sort within sections: future times first, then past times
-    sections.upcoming.sort((a, b) => {
-        const timeA = getNextInspectionTime(a.DateInspectTime) || new Date(0);
-        const timeB = getNextInspectionTime(b.DateInspectTime) || new Date(0);
-        const now = new Date();
+    if (currentView === 'closed') {
+        const closedItems = [...getVisibleItems()].sort((a, b) => getNumericId(b) - getNumericId(a));
+        renderSection('Closed', closedItems, 'closed-section');
+        return;
+    }
 
-        const aIsPast = timeA < now;
-        const bIsPast = timeB < now;
-
-        // Future times first, then past times
-        if (aIsPast === bIsPast) {
-            return timeA - timeB;
-        }
-        return aIsPast ? 1 : -1;
-    });
-
-    // Render each section
-    renderSection('Next Inspection', sections.next, 'next-section');
-    renderSection('Shortlist', sections.upcoming, 'upcoming-section');
-    renderSection('Closed', sections.closed, 'closed-section');
+    const sections = buildUpcomingAndShortlistSections(getVisibleItems());
+    renderSection('Upcoming', sections.next, 'next-section');
+    renderSection('Shortlist', sections.shortlist, 'upcoming-section');
 }
 
 /**
- * Categorize items into three sections: next, upcoming, closed
+ * Build Upcoming and Shortlist sections from a source list.
  */
-function categorizeSections(items) {
+function buildUpcomingAndShortlistSections(items) {
     const now = new Date();
-    const categorized = {
+    const sections = {
         next: [],
-        upcoming: [],
-        closed: []
+        shortlist: []
     };
 
     let nextItem = null;
     let nextTime = null;
 
     items.forEach((item) => {
-        // Check if closed
-        if (item.Status === 'Closed') {
-            categorized.closed.push(item);
-            return;
-        }
-
         // Parse inspection time to find upcoming
         const inspectTime = getNextInspectionTime(item.DateInspectTime);
         if (inspectTime) {
             if (inspectTime > now) {
-                // Future inspection
+                // Keep one nearest future inspection in Upcoming section.
                 if (!nextTime || inspectTime < nextTime) {
-                    // Bump previous 'next' to 'upcoming'
+                    // Bump previous upcoming card to shortlist.
                     if (nextItem) {
-                        categorized.upcoming.push(nextItem);
+                        sections.shortlist.push(nextItem);
                     }
-                    // Set new 'next'
                     nextItem = item;
                     nextTime = inspectTime;
                 } else {
-                    categorized.upcoming.push(item);
+                    sections.shortlist.push(item);
                 }
             } else {
-                // Past inspection - still add to upcoming
-                categorized.upcoming.push(item);
+                // Past inspection cards remain in shortlist.
+                sections.shortlist.push(item);
             }
+        } else {
+            sections.shortlist.push(item);
         }
     });
 
     if (nextItem) {
-        categorized.next.push(nextItem);
+        sections.next.push(nextItem);
     }
 
-    return categorized;
+    sections.shortlist.sort((a, b) => compareShortlistItems(a, b));
+    return sections;
+}
+
+/**
+ * Determine active list view from header toggles.
+ */
+function getCurrentView() {
+    return appState.viewMode;
+}
+
+/**
+ * Return items visible in the current view.
+ */
+function getVisibleItems() {
+    const currentView = getCurrentView();
+
+    if (currentView === 'planned') {
+        return appState.items.filter((item) => isPlannedInspectionStatus(item.Status));
+    }
+
+    if (currentView === 'closed') {
+        return appState.items.filter((item) => isClosedStatus(item.Status));
+    }
+
+    return appState.items.filter((item) => !isClosedStatus(item.Status));
+}
+
+function normalizeStatus(status) {
+    return String(status || '').trim().toLowerCase();
+}
+
+function isClosedStatus(status) {
+    return normalizeStatus(status) === 'closed';
+}
+
+function isPlannedInspectionStatus(status) {
+    return normalizeStatus(status) === 'planned inspection';
 }
 
 /**
@@ -247,6 +278,50 @@ function getNextInspectionTime(dateTimeStr) {
     });
 
     return parsed.sort((a, b) => a - b)[0];
+}
+
+/**
+ * Sort shortlist items by status priority and id.
+ */
+function compareShortlistItems(a, b) {
+    const statusPriorityA = getShortlistStatusPriority(a.Status);
+    const statusPriorityB = getShortlistStatusPriority(b.Status);
+
+    if (statusPriorityA !== statusPriorityB) {
+        return statusPriorityA - statusPriorityB;
+    }
+
+    // Planned Inspection entries are ordered by inspection date first.
+    if (statusPriorityA === 0) {
+        const timeA = getNextInspectionTime(a.DateInspectTime);
+        const timeB = getNextInspectionTime(b.DateInspectTime);
+
+        if (timeA && timeB && timeA.getTime() !== timeB.getTime()) {
+            return timeA - timeB;
+        }
+        if (timeA && !timeB) return -1;
+        if (!timeA && timeB) return 1;
+    }
+
+    return getNumericId(b) - getNumericId(a);
+}
+
+/**
+ * Priority order for shortlist statuses.
+ */
+function getShortlistStatusPriority(status) {
+    const normalizedStatus = normalizeStatus(status);
+
+    if (normalizedStatus === 'planned inspection') return 0;
+    return 1;
+}
+
+/**
+ * Normalize id for consistent numeric descending comparisons.
+ */
+function getNumericId(item) {
+    const parsedId = Number(item && item.id);
+    return Number.isFinite(parsedId) ? parsedId : -Infinity;
 }
 
 /**
@@ -528,6 +603,15 @@ async function fetchData() {
 function setupEventListeners() {
     dom.retryButton.addEventListener('click', fetchData);
     dom.closeDetailButton.addEventListener('click', deselectItem);
+
+    dom.viewModeRadios.forEach((radio) => {
+        radio.addEventListener('change', (event) => {
+            if (!event.target.checked) return;
+            updateAppState({
+                viewMode: event.target.value
+            });
+        });
+    });
 }
 
 /* ===========================

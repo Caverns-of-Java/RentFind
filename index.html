@@ -10,7 +10,23 @@
     <div class="app-container">
         <!-- Header -->
         <header class="app-header">
-            <h1>RentFind</h1>
+            <div class="header-inner">
+                <h1>RentFind</h1>
+                <div class="header-controls" role="radiogroup" aria-label="View mode">
+                <label class="filter-toggle" for="viewDefault">
+                    <input id="viewDefault" type="radio" name="viewMode" value="default" checked>
+                    <span>Default</span>
+                </label>
+                <label class="filter-toggle" for="viewPlanned">
+                    <input id="viewPlanned" type="radio" name="viewMode" value="planned">
+                    <span>Only planned inspections</span>
+                </label>
+                <label class="filter-toggle" for="viewClosed">
+                    <input id="viewClosed" type="radio" name="viewMode" value="closed">
+                    <span>Only closed ones</span>
+                </label>
+                </div>
+            </div>
         </header>
 
         <!-- Status/State Region -->

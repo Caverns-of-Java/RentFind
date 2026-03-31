@@ -40,9 +40,74 @@ body {
     flex-shrink: 0;
 }
 
+.header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
 .app-header h1 {
     font-size: 1.5rem;
     font-weight: 600;
+    flex-shrink: 0;
+}
+
+.header-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.filter-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.85rem;
+    color: #f8faff;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 999px;
+    padding: 0.35rem 0.6rem;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.filter-toggle input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+}
+
+.filter-toggle span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 0.2rem 0.45rem;
+    color: #f3f7ff;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.filter-toggle:hover {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.48);
+}
+
+.filter-toggle input:checked + span {
+    color: #10213b;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(16, 33, 59, 0.2);
+}
+
+.filter-toggle input:focus-visible + span {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
 }
 
 .content-wrapper {
@@ -421,6 +486,14 @@ a:focus {
 @media (min-width: 768px) {
     .app-header h1 {
         font-size: 2rem;
+    }
+
+    .header-controls {
+        gap: 0.75rem;
+    }
+
+    .filter-toggle {
+        font-size: 0.9rem;
     }
 
     /* Side-by-side layout on larger screens */
