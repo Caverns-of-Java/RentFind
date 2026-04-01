@@ -16,7 +16,9 @@ const appState = {
     viewMode: 'default',
     isAddCardOpen: false,
     isSubmittingAdd: false,
-    addCardError: null
+    addCardError: null,
+    addCardMode: 'add',
+    editingItemId: null
 };
 
 /* ===========================
@@ -46,11 +48,16 @@ const dom = {
 
     // Add card popup
     addCardOverlay: document.getElementById('addCardOverlay'),
+    addCardTitle: document.getElementById('addCardTitle'),
     addListingForm: document.getElementById('addListingForm'),
+    addId: document.getElementById('addId'),
     dismissAddCardButton: document.getElementById('dismissAddCardButton'),
     cancelAddCardButton: document.getElementById('cancelAddCardButton'),
     submitAddCardButton: document.getElementById('submitAddCardButton'),
-    addCardError: document.getElementById('addCardError')
+    addCardError: document.getElementById('addCardError'),
+
+    // Edit action
+    editDetailButton: document.getElementById('editDetailButton')
 };
 
 /* ===========================
@@ -348,7 +355,8 @@ function getShortlistStatusPriority(status) {
  * Normalize id for consistent numeric descending comparisons.
  */
 function getNumericId(item) {
-    const parsedId = Number(item && item.id);
+    const rawId = item && (item.Id ?? item.id);
+    const parsedId = Number(rawId);
     return Number.isFinite(parsedId) ? parsedId : -Infinity;
 }
 
@@ -461,8 +469,11 @@ function renderAddCardOverlay() {
     }
 
     const submitting = appState.isSubmittingAdd;
+    const isEditMode = appState.addCardMode === 'edit';
+
+    dom.addCardTitle.textContent = isEditMode ? 'Edit listing' : 'Add upcoming';
     dom.submitAddCardButton.disabled = submitting;
-    dom.submitAddCardButton.textContent = submitting ? 'Submitting...' : 'Submit';
+    dom.submitAddCardButton.textContent = submitting ? 'Submitting...' : (isEditMode ? 'Save' : 'Submit');
     dom.dismissAddCardButton.disabled = submitting;
     dom.cancelAddCardButton.disabled = submitting;
 }
@@ -484,6 +495,8 @@ function renderDetailPanel() {
     dom.detailPanel.classList.remove('hidden');
     dom.contentWrapper.classList.add('detail-open');
     const item = appState.selectedItem;
+        dom.editDetailButton.classList.remove('hidden');
+
     const itemUrl = getItemUrl(item);
     const mapUrl = getGoogleMapsSearchUrl(item);
 
@@ -662,9 +675,44 @@ function escapeHtml(text) {
 }
 
 function openAddCard() {
+    if (!dom.addListingForm) return;
+
+    dom.addListingForm.reset();
+    if (dom.addId) {
+        dom.addId.value = getNextIdValue();
+    }
+
     updateAppState({
         isAddCardOpen: true,
-        addCardError: null
+        addCardError: null,
+        addCardMode: 'add',
+        editingItemId: null
+    });
+}
+
+function openEditCard(item) {
+    if (!item || !dom.addListingForm) return;
+
+    const itemId = String(item.Id ?? item.id ?? '').trim();
+
+    dom.addListingForm.elements.Suburb.value = item.Suburb || '';
+    dom.addListingForm.elements.Address.value = item.Address || '';
+    dom.addListingForm.elements.PerWeek.value = item.PerWeek || '';
+    dom.addListingForm.elements.DateInspectTime.value = item.DateInspectTime || '';
+    dom.addListingForm.elements.Status.value = item.Status || 'Planned Inspection';
+    dom.addListingForm.elements.URL.value = item.URL || item.Url || item.url || '';
+    if (dom.addListingForm.elements.Note) {
+        dom.addListingForm.elements.Note.value = item.Note || '';
+    }
+    if (dom.addId) {
+        dom.addId.value = itemId;
+    }
+
+    updateAppState({
+        isAddCardOpen: true,
+        addCardError: null,
+        addCardMode: 'edit',
+        editingItemId: itemId || null
     });
 }
 
@@ -672,7 +720,9 @@ function closeAddCard() {
     updateAppState({
         isAddCardOpen: false,
         isSubmittingAdd: false,
-        addCardError: null
+        addCardError: null,
+        addCardMode: 'add',
+        editingItemId: null
     });
 
     if (dom.addListingForm) {
@@ -681,19 +731,28 @@ function closeAddCard() {
 }
 
 function buildAddListingPayload(formData) {
+    const formId = String(formData.get('Id') || '').trim();
+
     const payload = {
+        Id: formId,
+        id: formId,
         Suburb: String(formData.get('Suburb') || '').trim(),
         Address: String(formData.get('Address') || '').trim(),
         PerWeek: String(formData.get('PerWeek') || '').trim(),
         DateInspectTime: String(formData.get('DateInspectTime') || '').trim(),
         Status: String(formData.get('Status') || '').trim() || 'Planned Inspection',
-        URL: String(formData.get('URL') || '').trim()
+        URL: String(formData.get('URL') || '').trim(),
+        Note: String(formData.get('Note') || '').trim()
     };
 
     return payload;
 }
 
 function validateAddListingPayload(payload) {
+    if (!payload.Id) {
+        return 'Id is missing. Close and reopen the form.';
+    }
+
     if (!payload.Suburb || !payload.Address || !payload.PerWeek || !payload.DateInspectTime) {
         return 'Please complete all required fields.';
     }
@@ -710,11 +769,33 @@ function validateAddListingPayload(payload) {
     return null;
 }
 
+function getNextIdValue() {
+    const maxId = appState.items.reduce((acc, item) => {
+        const parsedId = Number(item && (item.Id ?? item.id));
+        if (!Number.isFinite(parsedId)) return acc;
+        return Math.max(acc, parsedId);
+    }, 0);
+
+    return String(maxId + 1).padStart(3, '0');
+}
+
 async function submitAddListing(event) {
     event.preventDefault();
 
     const formData = new FormData(dom.addListingForm);
     const payload = buildAddListingPayload(formData);
+    const isEditMode = appState.addCardMode === 'edit';
+
+    if (isEditMode) {
+        payload.Id = String(appState.editingItemId || payload.Id || payload.id || '');
+        payload.id = payload.Id;
+        payload._action = 'update';
+    } else {
+        payload.Id = payload.Id || getNextIdValue();
+        payload.id = payload.Id;
+        payload._action = 'add';
+    }
+
     const validationError = validateAddListingPayload(payload);
 
     if (validationError) {
@@ -730,14 +811,30 @@ async function submitAddListing(event) {
     try {
         const response = await fetch(CONFIG.API_URL, {
             method: 'POST',
+            redirect: 'follow',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'text/plain;charset=utf-8'
             },
             body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
             throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+
+        if (isEditMode) {
+            const editedId = String(payload.Id || payload.id);
+            appState.items = appState.items.map((item) => {
+                if (String(item && (item.Id ?? item.id)) !== editedId) {
+                    return item;
+                }
+
+                return {
+                    ...item,
+                    ...payload,
+                    _action: undefined
+                };
+            });
         }
 
         closeAddCard();
@@ -792,6 +889,13 @@ async function fetchData() {
 function setupEventListeners() {
     dom.retryButton.addEventListener('click', fetchData);
     dom.closeDetailButton.addEventListener('click', deselectItem);
+
+    if (dom.editDetailButton) {
+        dom.editDetailButton.addEventListener('click', () => {
+            if (!appState.selectedItem) return;
+            openEditCard(appState.selectedItem);
+        });
+    }
 
     dom.viewModeRadios.forEach((radio) => {
         radio.addEventListener('change', (event) => {

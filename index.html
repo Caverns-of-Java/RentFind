@@ -69,6 +69,10 @@
             <div id="detailPanel" class="detail-panel hidden">
                 <div class="detail-header">
                     <div class="detail-actions">
+                            <button id="editDetailButton" class="open-tab-icon hidden" type="button" aria-label="Edit listing" title="Edit listing">
+                                <span aria-hidden="true">✎</span>
+                                <span class="sr-only">Edit listing</span>
+                            </button>
                         <a id="openDetailUrlButton" class="open-tab-icon hidden" href="#" target="_blank" rel="noopener noreferrer" aria-label="Open listing in new tab" title="Open in new tab">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-up-right" viewBox="0 0 16 16" aria-hidden="true">
                               <path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5"/>
@@ -103,6 +107,10 @@
                 </div>
                 <form id="addListingForm" class="add-card-form">
                     <label class="add-card-field">
+                        <span>Id</span>
+                        <input id="addId" name="Id" type="text" readonly aria-readonly="true">
+                    </label>
+                    <label class="add-card-field">
                         <span>Suburb</span>
                         <input id="addSuburb" name="Suburb" type="text" required>
                     </label>
@@ -121,14 +129,19 @@
                     <label class="add-card-field">
                         <span>Status</span>
                         <select id="addStatus" name="Status">
+                            <option value="Inquired">Inquired</option>
                             <option value="Planned Inspection" selected>Planned Inspection</option>
                             <option value="Applied">Applied</option>
-                            <option value="Inquired">Inquired</option>
+                            <option value="Closed">Closed</option>
                         </select>
                     </label>
                     <label class="add-card-field">
                         <span>Listing URL</span>
                         <input id="addUrl" name="URL" type="url" placeholder="https://...">
+                    </label>
+                    <label class="add-card-field">
+                        <span>Note</span>
+                        <textarea id="addNote" name="Note" rows="3" placeholder="Optional notes"></textarea>
                     </label>
                     <p id="addCardError" class="add-card-error hidden" role="alert"></p>
                     <div class="add-card-actions">
