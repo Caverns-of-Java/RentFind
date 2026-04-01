@@ -360,6 +360,12 @@ body {
     align-items: center;
 }
 
+.detail-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .btn-close {
     background: none;
     border: none;
