@@ -233,6 +233,13 @@ body {
     gap: 0.75rem;
 }
 
+.list-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
 .list-section-title {
     font-size: var(--fs-section-title);
     font-weight: 600;
@@ -244,6 +251,29 @@ body {
 
 .list-section:first-of-type .list-section-title {
     margin-top: 0;
+}
+
+.upcoming-add-button {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    border: 2px solid #4f46e5;
+    background: #eef2ff;
+    color: #312e81;
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.upcoming-add-button:hover,
+.upcoming-add-button:active {
+    background: #e0e7ff;
+    transform: translateY(-1px);
 }
 
 .section-item-list {
@@ -489,6 +519,109 @@ body {
 .btn-primary:active {
     opacity: 0.85;
     transform: scale(0.98);
+}
+
+.btn-secondary {
+    background: #f0f2f7;
+    color: #334155;
+    border: 1px solid #d5dbe7;
+}
+
+.btn-secondary:hover,
+.btn-secondary:active {
+    background: #e5eaf4;
+}
+
+/* ===========================
+   ADD CARD POPUP
+   =========================== */
+.add-card-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 1200;
+}
+
+.add-card {
+    width: min(520px, 100%);
+    max-height: 90vh;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 14px;
+    border: 1px solid #d6deef;
+    box-shadow: 0 14px 40px rgba(15, 23, 42, 0.25);
+    padding: 1rem;
+}
+
+.add-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.add-card-header h2 {
+    font-size: 1.1rem;
+    color: #334155;
+}
+
+.add-card-close {
+    width: 36px;
+    height: 36px;
+}
+
+.add-card-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.add-card-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+    color: #4b5563;
+}
+
+.add-card-field input,
+.add-card-field select {
+    border: 1px solid #c9d2e4;
+    border-radius: 8px;
+    padding: 0.6rem 0.7rem;
+    font-size: 0.95rem;
+}
+
+.add-card-field input:focus,
+.add-card-field select:focus {
+    outline: 2px solid #b8c8f7;
+    border-color: #667eea;
+}
+
+.add-card-error {
+    color: #b42318;
+    background: #fff2f0;
+    border: 1px solid #ffd5d2;
+    border-radius: 8px;
+    padding: 0.6rem 0.7rem;
+    font-size: 0.9rem;
+}
+
+.add-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    margin-top: 0.25rem;
+}
+
+.add-card-actions .btn[disabled],
+.add-card-close[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 /* ===========================

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rentfind-v4';
+const CACHE_NAME = 'rentfind-v5';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -29,12 +29,18 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // Only handle same-origin GET requests
     if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
         return;
     }
 
+    // Network-first keeps app files fresh while still supporting offline fallback.
     event.respondWith(
-        caches.match(event.request).then((cached) => cached || fetch(event.request))
+        fetch(event.request)
+            .then((networkResponse) => {
+                const responseClone = networkResponse.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+                return networkResponse;
+            })
+            .catch(() => caches.match(event.request).then((cached) => cached || caches.match('./index.html')))
     );
 });

@@ -6,6 +6,7 @@
     <title>RentFind</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#667eea">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="RentFind">
@@ -88,6 +89,53 @@
                     </button>
                 </div>
                 <div id="detailContent" class="detail-content"></div>
+            </div>
+        </div>
+
+        <!-- Add Listing Mini Card -->
+        <div id="addCardOverlay" class="add-card-overlay hidden" aria-hidden="true">
+            <div class="add-card" role="dialog" aria-modal="true" aria-labelledby="addCardTitle">
+                <div class="add-card-header">
+                    <h2 id="addCardTitle">Add upcoming</h2>
+                    <button id="dismissAddCardButton" class="btn-close add-card-close" aria-label="Dismiss add card">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <form id="addListingForm" class="add-card-form">
+                    <label class="add-card-field">
+                        <span>Suburb</span>
+                        <input id="addSuburb" name="Suburb" type="text" required>
+                    </label>
+                    <label class="add-card-field">
+                        <span>Address</span>
+                        <input id="addAddress" name="Address" type="text" required>
+                    </label>
+                    <label class="add-card-field">
+                        <span>Rent per week</span>
+                        <input id="addPerWeek" name="PerWeek" type="number" min="0" step="1" required>
+                    </label>
+                    <label class="add-card-field">
+                        <span>Inspection time</span>
+                        <input id="addDateInspectTime" name="DateInspectTime" type="text" placeholder="YYYYMMDDTHHMM" required>
+                    </label>
+                    <label class="add-card-field">
+                        <span>Status</span>
+                        <select id="addStatus" name="Status">
+                            <option value="Planned Inspection" selected>Planned Inspection</option>
+                            <option value="Applied">Applied</option>
+                            <option value="Inquired">Inquired</option>
+                        </select>
+                    </label>
+                    <label class="add-card-field">
+                        <span>Listing URL</span>
+                        <input id="addUrl" name="URL" type="url" placeholder="https://...">
+                    </label>
+                    <p id="addCardError" class="add-card-error hidden" role="alert"></p>
+                    <div class="add-card-actions">
+                        <button id="cancelAddCardButton" type="button" class="btn btn-secondary">Dismiss</button>
+                        <button id="submitAddCardButton" type="submit" class="btn btn-primary">Submit</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

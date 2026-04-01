@@ -2,7 +2,7 @@
    CONFIGURATION
    =========================== */
 const CONFIG = {
-    API_URL: 'https://script.google.com/macros/s/AKfycbwFD_npEcxDkanBhE4s5eV94J_NCPHbSr1B4AIyrq7IchZrMFD_8bTnuop2brKOl1bv/exec'
+    API_URL: 'https://script.google.com/macros/s/AKfycby-87ppuNRo1ryH28copMoxKHwTpNF1_9gMr1ziRYpzB70TDVuIZgmEu8D7SF8NH4Hd/exec'
 };
 
 /* ===========================
@@ -13,7 +13,10 @@ const appState = {
     selectedItem: null,
     isLoading: false,
     error: null,
-    viewMode: 'default'
+    viewMode: 'default',
+    isAddCardOpen: false,
+    isSubmittingAdd: false,
+    addCardError: null
 };
 
 /* ===========================
@@ -39,7 +42,15 @@ const dom = {
     detailContent: document.getElementById('detailContent'),
     closeDetailButton: document.getElementById('closeDetailButton'),
     openDetailUrlButton: document.getElementById('openDetailUrlButton'),
-    openMapButton: document.getElementById('openMapButton')
+    openMapButton: document.getElementById('openMapButton'),
+
+    // Add card popup
+    addCardOverlay: document.getElementById('addCardOverlay'),
+    addListingForm: document.getElementById('addListingForm'),
+    dismissAddCardButton: document.getElementById('dismissAddCardButton'),
+    cancelAddCardButton: document.getElementById('cancelAddCardButton'),
+    submitAddCardButton: document.getElementById('submitAddCardButton'),
+    addCardError: document.getElementById('addCardError')
 };
 
 /* ===========================
@@ -102,6 +113,7 @@ function render() {
     renderHeaderControls();
     renderStateRegion();
     renderListView();
+    renderAddCardOverlay();
 
     if (appState.selectedItem && !getVisibleItems().includes(appState.selectedItem)) {
         appState.selectedItem = null;
@@ -130,12 +142,14 @@ function renderStateRegion() {
     dom.errorState.classList.add('hidden');
     dom.emptyState.classList.add('hidden');
 
+    const currentView = getCurrentView();
+
     if (appState.isLoading) {
         dom.loadingState.classList.remove('hidden');
     } else if (appState.error) {
         dom.errorMessage.textContent = appState.error;
         dom.errorState.classList.remove('hidden');
-    } else if (getVisibleItems().length === 0) {
+    } else if (getVisibleItems().length === 0 && currentView !== 'default') {
         dom.emptyState.classList.remove('hidden');
     } else {
         dom.statusRegion.classList.add('hidden');
@@ -146,7 +160,22 @@ function renderStateRegion() {
  * Render list of items
  */
 function renderListView() {
-    if (appState.isLoading || appState.error || getVisibleItems().length === 0) {
+    const visibleItems = getVisibleItems();
+    const currentView = getCurrentView();
+    const shouldForceDefaultList = currentView === 'default';
+
+    if (appState.isLoading) {
+        dom.listView.classList.add('hidden');
+        return;
+    }
+
+    // In Default view, keep list visible so the Upcoming add button is always available.
+    if (appState.error && !shouldForceDefaultList) {
+        dom.listView.classList.add('hidden');
+        return;
+    }
+
+    if (visibleItems.length === 0 && currentView !== 'default') {
         dom.listView.classList.add('hidden');
         return;
     }
@@ -154,22 +183,20 @@ function renderListView() {
     dom.listView.classList.remove('hidden');
     dom.itemList.innerHTML = '';
 
-    const currentView = getCurrentView();
-
     if (currentView === 'planned') {
-        const sections = buildUpcomingAndShortlistSections(getVisibleItems());
+        const sections = buildUpcomingAndShortlistSections(visibleItems);
         renderSection('Upcoming', sections.next, 'next-section');
         renderSection('Shortlist', sections.shortlist, 'upcoming-section');
         return;
     }
 
     if (currentView === 'closed') {
-        const closedItems = [...getVisibleItems()].sort((a, b) => getNumericId(b) - getNumericId(a));
+        const closedItems = [...visibleItems].sort((a, b) => getNumericId(b) - getNumericId(a));
         renderSection('Closed', closedItems, 'closed-section');
         return;
     }
 
-    const sections = buildUpcomingAndShortlistSections(getVisibleItems());
+    const sections = buildUpcomingAndShortlistSections(visibleItems);
     renderSection('Upcoming', sections.next, 'next-section');
     renderSection('Shortlist', sections.shortlist, 'upcoming-section');
 }
@@ -329,14 +356,33 @@ function getNumericId(item) {
  * Render a section with title and cards
  */
 function renderSection(title, items, sectionClass) {
-    if (items.length === 0) return;
+    const shouldShowAddButton = title === 'Upcoming' && getCurrentView() === 'default';
+    if (items.length === 0 && !shouldShowAddButton) return;
 
     const sectionDiv = document.createElement('div');
     sectionDiv.className = `list-section ${sectionClass}`;
 
+    const sectionHeader = document.createElement('div');
+    sectionHeader.className = 'list-section-header';
+
     const sectionTitle = document.createElement('h2');
     sectionTitle.className = 'list-section-title';
     sectionTitle.textContent = title;
+    sectionHeader.appendChild(sectionTitle);
+
+    if (shouldShowAddButton) {
+        const addButton = document.createElement('button');
+        addButton.type = 'button';
+        addButton.className = 'upcoming-add-button';
+        addButton.setAttribute('aria-label', 'Add upcoming listing');
+        addButton.setAttribute('title', 'Add upcoming listing');
+        addButton.innerHTML = '<span aria-hidden="true">+</span>';
+        addButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            openAddCard();
+        });
+        sectionHeader.appendChild(addButton);
+    }
 
     const sectionList = document.createElement('ul');
     sectionList.className = 'section-item-list';
@@ -390,9 +436,35 @@ function renderSection(title, items, sectionClass) {
         sectionList.appendChild(li);
     });
 
-    sectionDiv.appendChild(sectionTitle);
+    sectionDiv.appendChild(sectionHeader);
     sectionDiv.appendChild(sectionList);
     dom.itemList.appendChild(sectionDiv);
+}
+
+/**
+ * Reflect add-card popup state.
+ */
+function renderAddCardOverlay() {
+    if (!dom.addCardOverlay) return;
+
+    const isOpen = appState.isAddCardOpen;
+
+    dom.addCardOverlay.classList.toggle('hidden', !isOpen);
+    dom.addCardOverlay.setAttribute('aria-hidden', String(!isOpen));
+
+    if (appState.addCardError) {
+        dom.addCardError.textContent = appState.addCardError;
+        dom.addCardError.classList.remove('hidden');
+    } else {
+        dom.addCardError.textContent = '';
+        dom.addCardError.classList.add('hidden');
+    }
+
+    const submitting = appState.isSubmittingAdd;
+    dom.submitAddCardButton.disabled = submitting;
+    dom.submitAddCardButton.textContent = submitting ? 'Submitting...' : 'Submit';
+    dom.dismissAddCardButton.disabled = submitting;
+    dom.cancelAddCardButton.disabled = submitting;
 }
 
 /**
@@ -589,6 +661,96 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function openAddCard() {
+    updateAppState({
+        isAddCardOpen: true,
+        addCardError: null
+    });
+}
+
+function closeAddCard() {
+    updateAppState({
+        isAddCardOpen: false,
+        isSubmittingAdd: false,
+        addCardError: null
+    });
+
+    if (dom.addListingForm) {
+        dom.addListingForm.reset();
+    }
+}
+
+function buildAddListingPayload(formData) {
+    const payload = {
+        Suburb: String(formData.get('Suburb') || '').trim(),
+        Address: String(formData.get('Address') || '').trim(),
+        PerWeek: String(formData.get('PerWeek') || '').trim(),
+        DateInspectTime: String(formData.get('DateInspectTime') || '').trim(),
+        Status: String(formData.get('Status') || '').trim() || 'Planned Inspection',
+        URL: String(formData.get('URL') || '').trim()
+    };
+
+    return payload;
+}
+
+function validateAddListingPayload(payload) {
+    if (!payload.Suburb || !payload.Address || !payload.PerWeek || !payload.DateInspectTime) {
+        return 'Please complete all required fields.';
+    }
+
+    const inspectPattern = /^\d{8}T\d{4}(\s*,\s*\d{8}T\d{4})*$/;
+    if (!inspectPattern.test(payload.DateInspectTime)) {
+        return 'Inspection time must use YYYYMMDDTHHMM format.';
+    }
+
+    if (payload.URL && !/^https?:\/\//i.test(payload.URL)) {
+        return 'Listing URL must start with http:// or https://';
+    }
+
+    return null;
+}
+
+async function submitAddListing(event) {
+    event.preventDefault();
+
+    const formData = new FormData(dom.addListingForm);
+    const payload = buildAddListingPayload(formData);
+    const validationError = validateAddListingPayload(payload);
+
+    if (validationError) {
+        updateAppState({ addCardError: validationError });
+        return;
+    }
+
+    updateAppState({
+        isSubmittingAdd: true,
+        addCardError: null
+    });
+
+    try {
+        const response = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+
+        closeAddCard();
+        await fetchData();
+    } catch (err) {
+        console.error('Add listing error:', err);
+        updateAppState({
+            isSubmittingAdd: false,
+            addCardError: `Unable to save listing: ${err.message}`
+        });
+    }
+}
+
 /* ===========================
    API FETCHING
    =========================== */
@@ -638,6 +800,32 @@ function setupEventListeners() {
                 viewMode: event.target.value
             });
         });
+    });
+
+    if (dom.addListingForm) {
+        dom.addListingForm.addEventListener('submit', submitAddListing);
+    }
+
+    if (dom.dismissAddCardButton) {
+        dom.dismissAddCardButton.addEventListener('click', closeAddCard);
+    }
+
+    if (dom.cancelAddCardButton) {
+        dom.cancelAddCardButton.addEventListener('click', closeAddCard);
+    }
+
+    if (dom.addCardOverlay) {
+        dom.addCardOverlay.addEventListener('click', (event) => {
+            if (event.target === dom.addCardOverlay && !appState.isSubmittingAdd) {
+                closeAddCard();
+            }
+        });
+    }
+
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && appState.isAddCardOpen && !appState.isSubmittingAdd) {
+            closeAddCard();
+        }
     });
 }
 
