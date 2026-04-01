@@ -4,7 +4,7 @@
     "description": "Track and filter rental listings",
     "start_url": "./",
     "display": "standalone",
-    "background_color": "#667eea",
+    "background_color": "#FFF",
     "theme_color": "#667eea",
     "icons": [
         {
