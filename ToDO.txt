@@ -1,0 +1,3 @@
+on click on rentFrind, to refresh page on default mode
+inspectiondate time not mandatory if status is not Planned inspectiond
+PlannedInspection should not be default

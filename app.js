@@ -57,7 +57,10 @@ const dom = {
     addCardError: document.getElementById('addCardError'),
 
     // Edit action
-    editDetailButton: document.getElementById('editDetailButton')
+    editDetailButton: document.getElementById('editDetailButton'),
+
+    // App title
+    appTitle: document.getElementById('appTitle')
 };
 
 /* ===========================
@@ -682,6 +685,8 @@ function openAddCard() {
         dom.addId.value = getNextIdValue();
     }
 
+    syncInspectTimeRequired();
+
     updateAppState({
         isAddCardOpen: true,
         addCardError: null,
@@ -699,7 +704,7 @@ function openEditCard(item) {
     dom.addListingForm.elements.Address.value = item.Address || '';
     dom.addListingForm.elements.PerWeek.value = item.PerWeek || '';
     dom.addListingForm.elements.DateInspectTime.value = item.DateInspectTime || '';
-    dom.addListingForm.elements.Status.value = item.Status || 'Planned Inspection';
+    dom.addListingForm.elements.Status.value = item.Status || 'Inquired';
     dom.addListingForm.elements.URL.value = item.URL || item.Url || item.url || '';
     if (dom.addListingForm.elements.Note) {
         dom.addListingForm.elements.Note.value = item.Note || '';
@@ -707,6 +712,8 @@ function openEditCard(item) {
     if (dom.addId) {
         dom.addId.value = itemId;
     }
+
+    syncInspectTimeRequired();
 
     updateAppState({
         isAddCardOpen: true,
@@ -753,13 +760,21 @@ function validateAddListingPayload(payload) {
         return 'Id is missing. Close and reopen the form.';
     }
 
-    if (!payload.Suburb || !payload.Address || !payload.PerWeek || !payload.DateInspectTime) {
+    const isPlanned = normalizeStatus(payload.Status) === 'planned inspection';
+
+    if (!payload.Suburb || !payload.Address || !payload.PerWeek) {
         return 'Please complete all required fields.';
     }
 
-    const inspectPattern = /^\d{8}T\d{4}(\s*,\s*\d{8}T\d{4})*$/;
-    if (!inspectPattern.test(payload.DateInspectTime)) {
-        return 'Inspection time must use YYYYMMDDTHHMM format.';
+    if (isPlanned && !payload.DateInspectTime) {
+        return 'Inspection time is required for Planned Inspection.';
+    }
+
+    if (payload.DateInspectTime) {
+        const inspectPattern = /^\d{8}T\d{4}(\s*,\s*\d{8}T\d{4})*$/;
+        if (!inspectPattern.test(payload.DateInspectTime)) {
+            return 'Inspection time must use YYYYMMDDTHHMM format.';
+        }
     }
 
     if (payload.URL && !/^https?:\/\//i.test(payload.URL)) {
@@ -767,6 +782,13 @@ function validateAddListingPayload(payload) {
     }
 
     return null;
+}
+
+function syncInspectTimeRequired() {
+    const statusEl = document.getElementById('addStatus');
+    const dateEl = document.getElementById('addDateInspectTime');
+    if (!statusEl || !dateEl) return;
+    dateEl.required = normalizeStatus(statusEl.value) === 'planned inspection';
 }
 
 function getNextIdValue() {
@@ -889,6 +911,18 @@ async function fetchData() {
 function setupEventListeners() {
     dom.retryButton.addEventListener('click', fetchData);
     dom.closeDetailButton.addEventListener('click', deselectItem);
+
+    if (dom.appTitle) {
+        dom.appTitle.addEventListener('click', () => {
+            updateAppState({ viewMode: 'default' });
+            fetchData();
+        });
+    }
+
+    const addStatusEl = document.getElementById('addStatus');
+    if (addStatusEl) {
+        addStatusEl.addEventListener('change', syncInspectTimeRequired);
+    }
 
     if (dom.editDetailButton) {
         dom.editDetailButton.addEventListener('click', () => {
