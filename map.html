@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RentFind Inspection Map</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#667eea">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        :root {
+            --color-bg: #f5f5f5;
+            --color-card: #ffffff;
+            --color-primary: #667eea;
+            --color-primary-alt: #764ba2;
+            --color-text: #1f2937;
+            --color-muted: #6b7280;
+            --color-border: #dbe1f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(180deg, #edf2ff 0%, var(--color-bg) 280px);
+            color: var(--color-text);
+            min-height: 100vh;
+        }
+
+        .map-page {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+            min-height: 100vh;
+        }
+
+        .map-header {
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-alt) 100%);
+            color: #fff;
+            border-radius: 14px;
+            padding: 0.9rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.8rem;
+            box-shadow: 0 6px 22px rgba(54, 84, 173, 0.22);
+            flex-wrap: wrap;
+        }
+
+        .map-header h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .map-header a {
+            text-decoration: none;
+            color: #10213b;
+            background: #fff;
+            border-radius: 999px;
+            padding: 0.4rem 0.75rem;
+            font-weight: 600;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+        }
+
+        .map-controls {
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            padding: 0.7rem 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .toggle-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.95rem;
+            color: var(--color-text);
+            user-select: none;
+        }
+
+        .toggle-wrap input {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--color-primary);
+        }
+
+        .map-status {
+            font-size: 0.88rem;
+            color: var(--color-muted);
+        }
+
+        .map-shell {
+            background: var(--color-card);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            overflow: hidden;
+            flex: 1;
+            min-height: 62vh;
+        }
+
+        #inspectionMap {
+            width: 100%;
+            height: 100%;
+            min-height: 62vh;
+        }
+
+        @media (max-width: 768px) {
+            .map-shell,
+            #inspectionMap {
+                min-height: 72vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="map-page">
+        <header class="map-header">
+            <h1>Inspection Map</h1>
+            <a href="index.html" aria-label="Back to listings">Back to list</a>
+        </header>
+
+        <section class="map-controls" aria-label="Map filters">
+            <label class="toggle-wrap" for="todayOnlyToggle">
+                <input id="todayOnlyToggle" type="checkbox">
+                <span>Today's inspections only</span>
+            </label>
+            <p id="mapStatus" class="map-status">Loading inspections...</p>
+        </section>
+
+        <section class="map-shell" aria-label="Planned inspection locations map">
+            <div id="inspectionMap"></div>
+        </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="map.js"></script>
+</body>
+</html>

@@ -1,9 +1,11 @@
-const CACHE_NAME = 'rentfind-v8';
+const CACHE_NAME = 'rentfind-v9';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
+    './map.html',
     './styles.css',
     './app.js',
+    './map.js',
     './manifest.json',
     './icons/icon.svg'
 ];
