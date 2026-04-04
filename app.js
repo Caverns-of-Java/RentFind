@@ -21,6 +21,11 @@ const appState = {
     editingItemId: null
 };
 
+const mapState = {
+    instance: null,
+    requestId: 0
+};
+
 /* ===========================
    DOM REFERENCES
    =========================== */
@@ -486,6 +491,7 @@ function renderAddCardOverlay() {
  */
 function renderDetailPanel() {
     if (!appState.selectedItem) {
+        clearDetailMap();
         dom.detailPanel.classList.add('hidden');
         dom.contentWrapper.classList.remove('detail-open');
         dom.openDetailUrlButton.classList.add('hidden');
@@ -501,7 +507,7 @@ function renderDetailPanel() {
         dom.editDetailButton.classList.remove('hidden');
 
     const itemUrl = getItemUrl(item);
-    const mapUrl = getGoogleMapsSearchUrl(item);
+    const mapUrl = getOpenStreetMapSearchUrl(item);
 
     if (mapUrl) {
         dom.openMapButton.classList.remove('hidden');
@@ -534,6 +540,10 @@ function renderDetailPanel() {
                     <span class="sr-only">Open in new tab</span>
                 </a>
             </div>
+            <div class="detail-map-section">
+                <div id="detailMap" class="detail-map" role="region" aria-label="Listing map"></div>
+                <p id="mapStatus" class="map-status">Loading map...</p>
+            </div>
         `;
 
         const iframe = document.getElementById('detailListingFrame');
@@ -561,12 +571,20 @@ function renderDetailPanel() {
         });
 
         iframe.src = itemUrl;
+        renderItemMap(item);
         return;
     }
 
     dom.openDetailUrlButton.classList.add('hidden');
     dom.openDetailUrlButton.setAttribute('href', '#');
-    dom.detailContent.innerHTML = '<p>No URL available for this listing.</p>';
+    dom.detailContent.innerHTML = `
+        <p>No URL available for this listing.</p>
+        <div class="detail-map-section">
+            <div id="detailMap" class="detail-map" role="region" aria-label="Listing map"></div>
+            <p id="mapStatus" class="map-status">Loading map...</p>
+        </div>
+    `;
+    renderItemMap(item);
 }
 
 /**
@@ -654,9 +672,9 @@ function getItemUrl(item) {
 }
 
 /**
- * Build Google Maps search URL from address and suburb fields.
+ * Build OpenStreetMap search URL from address and suburb fields.
  */
-function getGoogleMapsSearchUrl(item) {
+function getOpenStreetMapSearchUrl(item) {
     const address = (item.Address || item.address || '').toString().trim();
     const suburb = (item.Suburb || item.suburb || '').toString().trim();
     const query = [address, suburb].filter(Boolean).join(', ');
@@ -665,7 +683,162 @@ function getGoogleMapsSearchUrl(item) {
         return '';
     }
 
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+    return `https://www.openstreetmap.org/search?query=${encodeURIComponent(query)}`;
+}
+
+function getLocationQuery(item) {
+    const address = (item.Address || item.address || '').toString().trim();
+    const suburb = (item.Suburb || item.suburb || '').toString().trim();
+    return [address, suburb].filter(Boolean).join(', ');
+}
+
+function clearDetailMap() {
+    mapState.requestId += 1;
+    if (!mapState.instance) return;
+    mapState.instance.remove();
+    mapState.instance = null;
+}
+
+async function geocodeAddress(query) {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+    const response = await fetch(url, {
+        headers: {
+            Accept: 'application/json'
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Geocode failed: ${response.status}`);
+    }
+
+    const results = await response.json();
+    if (!Array.isArray(results) || results.length === 0) {
+        return null;
+    }
+
+    const first = results[0];
+    const lat = Number(first.lat);
+    const lng = Number(first.lon);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return null;
+    }
+
+    return {
+        lat,
+        lng,
+        label: first.display_name || query
+    };
+}
+
+function getUserLocation() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error('Geolocation unavailable'));
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                resolve({
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                });
+            },
+            (error) => reject(error),
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 30000
+            }
+        );
+    });
+}
+
+async function renderItemMap(item) {
+    const mapContainer = document.getElementById('detailMap');
+    const mapStatus = document.getElementById('mapStatus');
+
+    if (!mapContainer || !mapStatus) return;
+
+    if (typeof L === 'undefined') {
+        mapStatus.textContent = 'Map library failed to load.';
+        return;
+    }
+
+    const query = getLocationQuery(item);
+    if (!query) {
+        mapStatus.textContent = 'No address available to locate this listing.';
+        return;
+    }
+
+    const requestId = mapState.requestId + 1;
+    clearDetailMap();
+    mapState.requestId = requestId;
+    mapStatus.textContent = 'Searching address on OpenStreetMap...';
+
+    let listingLocation;
+    try {
+        listingLocation = await geocodeAddress(query);
+    } catch (error) {
+        mapStatus.textContent = 'Unable to look up this address right now.';
+        return;
+    }
+
+    if (mapState.requestId !== requestId) {
+        return;
+    }
+
+    if (!listingLocation) {
+        mapStatus.textContent = 'Address was not found in OpenStreetMap search.';
+        return;
+    }
+
+    const map = L.map(mapContainer).setView([listingLocation.lat, listingLocation.lng], 15);
+    mapState.instance = map;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    L.marker([listingLocation.lat, listingLocation.lng])
+        .addTo(map)
+        .bindPopup(`Listing: ${escapeHtml(listingLocation.label)}`)
+        .openPopup();
+
+    const bounds = [[listingLocation.lat, listingLocation.lng]];
+
+    try {
+        mapStatus.textContent = 'Listing shown. Finding your current location...';
+        const userLocation = await getUserLocation();
+
+        if (mapState.requestId !== requestId || !mapState.instance) {
+            return;
+        }
+
+        L.circleMarker([userLocation.lat, userLocation.lng], {
+            radius: 8,
+            color: '#1d4ed8',
+            fillColor: '#3b82f6',
+            fillOpacity: 0.85,
+            weight: 2
+        })
+            .addTo(map)
+            .bindPopup('Your current location');
+
+        bounds.push([userLocation.lat, userLocation.lng]);
+        map.fitBounds(bounds, { padding: [30, 30] });
+        mapStatus.textContent = 'Showing listing and your current location.';
+    } catch (error) {
+        mapStatus.textContent = 'Showing listing location. Allow location access to show your current point.';
+    }
+
+    window.setTimeout(() => {
+        if (mapState.instance) {
+            mapState.instance.invalidateSize();
+        }
+    }, 0);
 }
 
 /**

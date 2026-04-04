@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rentfind-v6';
+const CACHE_NAME = 'rentfind-v7';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
