@@ -26,6 +26,9 @@ const mapState = {
     requestId: 0
 };
 
+// Tracks the list of YYYYMMDDTHHMM strings for the multi datetime picker in the add/edit form.
+let inspectTimes = [];
+
 /* ===========================
    DOM REFERENCES
    =========================== */
@@ -299,28 +302,36 @@ function isPlannedInspectionStatus(status) {
 }
 
 /**
+ * Parse DateInspectTime into sorted Date objects.
+ */
+function parseInspectionTimes(dateTimeStr) {
+    if (!dateTimeStr || typeof dateTimeStr !== 'string') return [];
+
+    return dateTimeStr
+        .split(',')
+        .map((part) => part.trim())
+        .filter((part) => part.length === 13 && part[8] === 'T')
+        .map((rawValue) => {
+            const year = rawValue.substring(0, 4);
+            const month = rawValue.substring(4, 6);
+            const day = rawValue.substring(6, 8);
+            const hour = rawValue.substring(9, 11);
+            const minute = rawValue.substring(11, 13);
+            return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
+        })
+        .sort((a, b) => a - b);
+}
+
+/**
  * Parse DateInspectTime and return the earliest upcoming inspection Date object.
  */
 function getNextInspectionTime(dateTimeStr) {
-    if (!dateTimeStr || typeof dateTimeStr !== 'string') return null;
+    const parsed = parseInspectionTimes(dateTimeStr);
+    if (parsed.length === 0) return null;
 
-    const timestamps = dateTimeStr
-        .split(',')
-        .map((part) => part.trim())
-        .filter((part) => part.length === 13 && part[8] === 'T');
-
-    if (timestamps.length === 0) return null;
-
-    const parsed = timestamps.map((rawValue) => {
-        const year = rawValue.substring(0, 4);
-        const month = rawValue.substring(4, 6);
-        const day = rawValue.substring(6, 8);
-        const hour = rawValue.substring(9, 11);
-        const minute = rawValue.substring(11, 13);
-        return new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
-    });
-
-    return parsed.sort((a, b) => a - b)[0];
+    const now = new Date();
+    const nextUpcoming = parsed.find((inspectTime) => inspectTime > now);
+    return nextUpcoming || parsed[0];
 }
 
 /**
@@ -854,6 +865,8 @@ function openAddCard() {
     if (!dom.addListingForm) return;
 
     dom.addListingForm.reset();
+    inspectTimes = [];
+    renderInspectTimeList();
     if (dom.addId) {
         dom.addId.value = getNextIdValue();
     }
@@ -873,14 +886,16 @@ function openEditCard(item) {
 
     const itemId = String(item.Id ?? item.id ?? '').trim();
 
-    dom.addListingForm.elements.Suburb.value = item.Suburb || '';
-    dom.addListingForm.elements.Address.value = item.Address || '';
-    dom.addListingForm.elements.PerWeek.value = item.PerWeek || '';
-    dom.addListingForm.elements.DateInspectTime.value = item.DateInspectTime || '';
-    dom.addListingForm.elements.Status.value = item.Status || 'Inquired';
-    dom.addListingForm.elements.URL.value = item.URL || item.Url || item.url || '';
-    if (dom.addListingForm.elements.Note) {
-        dom.addListingForm.elements.Note.value = item.Note || '';
+    document.getElementById('addSuburb').value = item.Suburb || '';
+    document.getElementById('addAddress').value = item.Address || '';
+    document.getElementById('addPerWeek').value = item.PerWeek || '';
+    inspectTimes = (item.DateInspectTime || '').split(',').map((t) => t.trim()).filter(Boolean);
+    renderInspectTimeList();
+    document.getElementById('addStatus').value = item.Status || 'Inquired';
+    document.getElementById('addUrl').value = item.URL || item.Url || item.url || '';
+    const noteEl = document.getElementById('addNote');
+    if (noteEl) {
+        noteEl.value = item.Note || '';
     }
     if (dom.addId) {
         dom.addId.value = itemId;
@@ -907,22 +922,24 @@ function closeAddCard() {
 
     if (dom.addListingForm) {
         dom.addListingForm.reset();
+        inspectTimes = [];
+        renderInspectTimeList();
     }
 }
 
 function buildAddListingPayload(formData) {
-    const formId = String(formData.get('Id') || '').trim();
+    const formId = String(formData.get('listingId') || '').trim();
 
     const payload = {
         Id: formId,
         id: formId,
-        Suburb: String(formData.get('Suburb') || '').trim(),
-        Address: String(formData.get('Address') || '').trim(),
-        PerWeek: String(formData.get('PerWeek') || '').trim(),
-        DateInspectTime: String(formData.get('DateInspectTime') || '').trim(),
-        Status: String(formData.get('Status') || '').trim() || 'Planned Inspection',
-        URL: String(formData.get('URL') || '').trim(),
-        Note: String(formData.get('Note') || '').trim()
+        Suburb: String(formData.get('listingSuburb') || '').trim(),
+        Address: String(formData.get('listingAddress') || '').trim(),
+        PerWeek: String(formData.get('listingPerWeek') || '').trim(),
+        DateInspectTime: String(formData.get('listingDateInspectTime') || '').trim(),
+        Status: String(formData.get('listingStatus') || '').trim() || 'Planned Inspection',
+        URL: String(formData.get('listingUrl') || '').trim(),
+        Note: String(formData.get('listingNote') || '').trim()
     };
 
     return payload;
@@ -962,6 +979,47 @@ function syncInspectTimeRequired() {
     const dateEl = document.getElementById('addDateInspectTime');
     if (!statusEl || !dateEl) return;
     dateEl.required = normalizeStatus(statusEl.value) === 'planned inspection';
+}
+
+/**
+ * Convert a datetime-local input value (YYYY-MM-DDTHH:MM) to stored format (YYYYMMDDTHHMM).
+ */
+function datetimeLocalToStored(val) {
+    if (!val || val.length < 16) return null;
+    const tIdx = val.indexOf('T');
+    if (tIdx < 0) return null;
+    const datePart = val.substring(0, tIdx).replace(/-/g, '');
+    const timePart = val.substring(tIdx + 1, tIdx + 6).replace(':', '');
+    if (datePart.length !== 8 || timePart.length !== 4) return null;
+    return `${datePart}T${timePart}`;
+}
+
+/**
+ * Re-render the inspect times list UI and sync the hidden input.
+ */
+function renderInspectTimeList() {
+    const listEl = document.getElementById('addDateInspectList');
+    const hiddenEl = document.getElementById('addDateInspectTime');
+    if (!listEl || !hiddenEl) return;
+
+    listEl.innerHTML = '';
+    inspectTimes.forEach((t, i) => {
+        const li = document.createElement('li');
+        li.className = 'inspect-time-item';
+        const span = document.createElement('span');
+        span.textContent = formatInspectTimes(t) || t;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'inspect-time-remove';
+        btn.setAttribute('aria-label', 'Remove inspection time');
+        btn.dataset.index = String(i);
+        btn.textContent = '×';
+        li.appendChild(span);
+        li.appendChild(btn);
+        listEl.appendChild(li);
+    });
+
+    hiddenEl.value = inspectTimes.join(',');
 }
 
 function getNextIdValue() {
@@ -1115,6 +1173,33 @@ function setupEventListeners() {
 
     if (dom.addListingForm) {
         dom.addListingForm.addEventListener('submit', submitAddListing);
+    }
+
+    const addInspectTimeBtn = document.getElementById('addDateInspectTimeAddBtn');
+    if (addInspectTimeBtn) {
+        addInspectTimeBtn.addEventListener('click', () => {
+            const picker = document.getElementById('addDateInspectTimePicker');
+            if (!picker || !picker.value) return;
+            const stored = datetimeLocalToStored(picker.value);
+            if (stored && !inspectTimes.includes(stored)) {
+                inspectTimes.push(stored);
+                renderInspectTimeList();
+            }
+            picker.value = '';
+        });
+    }
+
+    const inspectTimeList = document.getElementById('addDateInspectList');
+    if (inspectTimeList) {
+        inspectTimeList.addEventListener('click', (event) => {
+            const btn = event.target.closest('.inspect-time-remove');
+            if (!btn) return;
+            const idx = parseInt(btn.dataset.index, 10);
+            if (!isNaN(idx) && idx >= 0 && idx < inspectTimes.length) {
+                inspectTimes.splice(idx, 1);
+                renderInspectTimeList();
+            }
+        });
     }
 
     if (dom.dismissAddCardButton) {

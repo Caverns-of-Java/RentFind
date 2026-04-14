@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rentfind-v10';
+const CACHE_NAME = 'rentfind-v11';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
@@ -35,6 +35,8 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    const isNavigationRequest = event.request.mode === 'navigate';
+
     // Network-first keeps app files fresh while still supporting offline fallback.
     event.respondWith(
         fetch(event.request)
@@ -43,6 +45,17 @@ self.addEventListener('fetch', (event) => {
                 caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
                 return networkResponse;
             })
-            .catch(() => caches.match(event.request).then((cached) => cached || caches.match('./index.html')))
+            .catch(async () => {
+                const cached = await caches.match(event.request);
+                if (cached) {
+                    return cached;
+                }
+
+                if (isNavigationRequest) {
+                    return caches.match('./index.html');
+                }
+
+                return Response.error();
+            })
     );
 });

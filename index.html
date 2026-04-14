@@ -107,30 +107,35 @@
                         <span>&times;</span>
                     </button>
                 </div>
-                <form id="addListingForm" class="add-card-form">
+                <form id="addListingForm" class="add-card-form" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
                     <label class="add-card-field">
                         <span>Id</span>
-                        <input id="addId" name="Id" type="text" readonly aria-readonly="true">
+                        <input id="addId" name="listingId" type="text" readonly aria-readonly="true" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
                     </label>
                     <label class="add-card-field">
                         <span>Suburb</span>
-                        <input id="addSuburb" name="Suburb" type="text" required>
+                        <input id="addSuburb" name="listingSuburb" type="text" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
                     </label>
                     <label class="add-card-field">
                         <span>Address</span>
-                        <input id="addAddress" name="Address" type="text" required>
+                        <input id="addAddress" name="listingAddress" type="text" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
                     </label>
                     <label class="add-card-field">
                         <span>Rent per week</span>
-                        <input id="addPerWeek" name="PerWeek" type="number" min="0" step="1" required>
+                        <input id="addPerWeek" name="listingPerWeek" type="number" min="0" step="1" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
                     </label>
-                    <label class="add-card-field">
-                        <span>Inspection time</span>
-                        <input id="addDateInspectTime" name="DateInspectTime" type="text" placeholder="YYYYMMDDTHHMM">
-                    </label>
+                    <div class="add-card-field">
+                        <span>Inspection time(s)</span>
+                        <div class="inspect-time-picker-row">
+                            <input id="addDateInspectTimePicker" type="datetime-local" autocomplete="off">
+                            <button type="button" id="addDateInspectTimeAddBtn" class="btn btn-secondary">Add</button>
+                        </div>
+                        <ul id="addDateInspectList" class="inspect-time-list"></ul>
+                        <input id="addDateInspectTime" name="listingDateInspectTime" type="hidden" autocomplete="off">
+                    </div>
                     <label class="add-card-field">
                         <span>Status</span>
-                        <select id="addStatus" name="Status">
+                        <select id="addStatus" name="listingStatus" autocomplete="off">
                             <option value="Inquired" selected>Inquired</option>
                             <option value="Planned Inspection">Planned Inspection</option>
                             <option value="Applied">Applied</option>
@@ -139,11 +144,11 @@
                     </label>
                     <label class="add-card-field">
                         <span>Listing URL</span>
-                        <input id="addUrl" name="URL" type="url" placeholder="https://...">
+                        <input id="addUrl" name="listingUrl" type="url" placeholder="https://..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
                     </label>
                     <label class="add-card-field">
                         <span>Note</span>
-                        <textarea id="addNote" name="Note" rows="3" placeholder="Optional notes"></textarea>
+                        <textarea id="addNote" name="listingNote" rows="3" placeholder="Optional notes" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
                     </label>
                     <p id="addCardError" class="add-card-error hidden" role="alert"></p>
                     <div class="add-card-actions">
