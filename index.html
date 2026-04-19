@@ -15,13 +15,30 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="app-container">
+    <div id="authOverlay" class="auth-overlay">
+        <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+            <h1 id="authTitle">RentFind</h1>
+            <p class="auth-subtitle">Enter password to view this app.</p>
+            <form id="authForm" class="auth-form" autocomplete="off">
+                <label class="auth-label" for="authPasswordInput">Password</label>
+                <input id="authPasswordInput" type="password" inputmode="numeric" autocomplete="off" required>
+                <p class="auth-note">This is a lightweight gate for convenience, not full security.</p>
+                <p id="authError" class="auth-error hidden" role="alert"></p>
+                <button type="submit" class="btn btn-primary">Unlock</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="appRoot" class="app-container hidden">
         <!-- Header -->
         <header class="app-header">
             <div class="header-inner">
                 <h1 id="appTitle" style="cursor:pointer" title="Refresh">RentFind</h1>
                 <div class="header-controls" role="radiogroup" aria-label="View mode">
                 <a class="header-map-link" href="map.html" aria-label="Open inspection map">Map</a>
+                <button id="lockButton" type="button" class="filter-toggle hidden" aria-label="Lock app">
+                    <span>Lock</span>
+                </button>
                 <label class="filter-toggle" for="viewDefault">
                     <input id="viewDefault" type="radio" name="viewMode" value="default" checked>
                     <span>Default</span>

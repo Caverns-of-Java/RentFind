@@ -2,6 +2,10 @@ const CONFIG = {
     API_URL: 'https://script.google.com/macros/s/AKfycby-87ppuNRo1ryH28copMoxKHwTpNF1_9gMr1ziRYpzB70TDVuIZgmEu8D7SF8NH4Hd/exec'
 };
 
+const GEOCODE_CACHE_KEY = 'rentfind_geocode_cache_v2';
+const GEOCODE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 const state = {
     map: null,
     markersLayer: null,
@@ -249,8 +253,6 @@ function hasInspectionToday(dateTimeStr) {
 function formatInspectTimes(dateTimeStr) {
     if (!dateTimeStr || typeof dateTimeStr !== 'string') return '';
 
-    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
     const parsed = dateTimeStr
         .split(',')
         .map((part) => part.trim())
@@ -267,7 +269,7 @@ function formatInspectTimes(dateTimeStr) {
             const minute = rawValue.substring(11, 13);
 
             const date = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
-            const weekday = weekdays[date.getDay()];
+            const weekday = WEEKDAY_NAMES[date.getDay()];
 
             return `(${weekday}) ${day}/${month}/${year.substring(2)} ${hour}:${minute}`;
         });
@@ -279,8 +281,13 @@ async function geocodeAddress(query) {
     if (!query) return null;
 
     const cacheHit = state.geocodeCache[query];
-    if (cacheHit && Number.isFinite(cacheHit.lat) && Number.isFinite(cacheHit.lng)) {
+    const isCacheFresh = cacheHit && Number.isFinite(cacheHit.cachedAt) && (Date.now() - cacheHit.cachedAt <= GEOCODE_CACHE_TTL_MS);
+    if (isCacheFresh && Number.isFinite(cacheHit.lat) && Number.isFinite(cacheHit.lng)) {
         return cacheHit;
+    }
+
+    if (cacheHit && !isCacheFresh) {
+        delete state.geocodeCache[query];
     }
 
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
@@ -312,7 +319,8 @@ async function geocodeAddress(query) {
         const value = {
             lat,
             lng,
-            label: first.display_name || query
+            label: first.display_name || query,
+            cachedAt: Date.now()
         };
 
         state.geocodeCache[query] = value;
@@ -325,7 +333,7 @@ async function geocodeAddress(query) {
 
 function loadGeocodeCache() {
     try {
-        const raw = localStorage.getItem('rentfind_geocode_cache_v1');
+        const raw = localStorage.getItem(GEOCODE_CACHE_KEY);
         if (!raw) return {};
         const parsed = JSON.parse(raw);
         if (!parsed || typeof parsed !== 'object') return {};
@@ -337,7 +345,7 @@ function loadGeocodeCache() {
 
 function saveGeocodeCache(cache) {
     try {
-        localStorage.setItem('rentfind_geocode_cache_v1', JSON.stringify(cache));
+        localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache));
     } catch (error) {
         // Ignore storage failures.
     }

@@ -5,6 +5,15 @@ const CONFIG = {
     API_URL: 'https://script.google.com/macros/s/AKfycby-87ppuNRo1ryH28copMoxKHwTpNF1_9gMr1ziRYpzB70TDVuIZgmEu8D7SF8NH4Hd/exec'
 };
 
+const AUTH_CONFIG = {
+    SESSION_KEY: 'rentfind_auth_unlocked',
+    PASSWORD_HASH_SHA256: '21eb478c997305f06e5e0d043d3ec5acc63a85938da69e14f239f34a8348fc54'
+};
+
+const GEOCODE_CACHE_KEY = 'rentfind_detail_geocode_cache_v1';
+const GEOCODE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 /* ===========================
    APP STATE
    =========================== */
@@ -18,7 +27,8 @@ const appState = {
     isSubmittingAdd: false,
     addCardError: null,
     addCardMode: 'add',
-    editingItemId: null
+    editingItemId: null,
+    isAuthenticated: false
 };
 
 const mapState = {
@@ -33,6 +43,15 @@ let inspectTimes = [];
    DOM REFERENCES
    =========================== */
 const dom = {
+    appRoot: document.getElementById('appRoot'),
+
+    // Auth gate
+    authOverlay: document.getElementById('authOverlay'),
+    authForm: document.getElementById('authForm'),
+    authPasswordInput: document.getElementById('authPasswordInput'),
+    authError: document.getElementById('authError'),
+    lockButton: document.getElementById('lockButton'),
+
     // State regions
     statusRegion: document.querySelector('.status-region'),
     loadingState: document.getElementById('loadingState'),
@@ -279,26 +298,37 @@ function getVisibleItems() {
     const currentView = getCurrentView();
 
     if (currentView === 'planned') {
-        return appState.items.filter((item) => isPlannedInspectionStatus(item.Status));
+        return appState.items.filter((item) => isPlannedInspectionStatus(item));
     }
 
     if (currentView === 'closed') {
-        return appState.items.filter((item) => isClosedStatus(item.Status));
+        return appState.items.filter((item) => isClosedStatus(item));
     }
 
-    return appState.items.filter((item) => !isClosedStatus(item.Status));
+    return appState.items.filter((item) => !isClosedStatus(item));
 }
 
 function normalizeStatus(status) {
     return String(status || '').trim().toLowerCase();
 }
 
+function getNormalizedStatus(input) {
+    if (input && typeof input === 'object') {
+        if (typeof input._statusNormalized === 'string') {
+            return input._statusNormalized;
+        }
+        return normalizeStatus(input.Status);
+    }
+
+    return normalizeStatus(input);
+}
+
 function isClosedStatus(status) {
-    return normalizeStatus(status) === 'closed';
+    return getNormalizedStatus(status) === 'closed';
 }
 
 function isPlannedInspectionStatus(status) {
-    return normalizeStatus(status) === 'planned inspection';
+    return getNormalizedStatus(status) === 'planned inspection';
 }
 
 /**
@@ -615,8 +645,6 @@ function formatFieldLabel(key) {
 function formatInspectTimes(dateTimeStr) {
     if (!dateTimeStr || typeof dateTimeStr !== 'string') return '';
 
-    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
     const parsed = dateTimeStr
         .split(',')
         .map((part) => part.trim())
@@ -634,7 +662,7 @@ function formatInspectTimes(dateTimeStr) {
 
             // Create Date to get weekday
             const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
-            const weekday = weekdays[date.getDay()];
+            const weekday = WEEKDAY_NAMES[date.getDay()];
 
             return `(${weekday}) ${day}/${month}/${year.substring(2)} ${hour}:${minute}`;
         });
@@ -651,6 +679,14 @@ function formatItemValue(key, value) {
     }
 
     if (key.toLowerCase() === 'perweek') {
+        const weeklyAmount = Number(value);
+        if (Number.isFinite(weeklyAmount)) {
+            const monthlyAmount = Math.round((weeklyAmount * 52) / 12);
+            const weeklyText = formatCurrencyAmount(weeklyAmount);
+            const monthlyText = formatCurrencyAmount(monthlyAmount);
+            return `$${weeklyText}/week ($${monthlyText}/month)`;
+        }
+
         return `$${value}/week`;
     }
 
@@ -686,9 +722,7 @@ function getItemUrl(item) {
  * Build OpenStreetMap search URL from address and suburb fields.
  */
 function getOpenStreetMapSearchUrl(item) {
-    const address = (item.Address || item.address || '').toString().trim();
-    const suburb = (item.Suburb || item.suburb || '').toString().trim();
-    const query = [address, suburb].filter(Boolean).join(', ');
+    const query = buildLocationQuery(item);
 
     if (!query) {
         return '';
@@ -698,6 +732,10 @@ function getOpenStreetMapSearchUrl(item) {
 }
 
 function getLocationQuery(item) {
+    return buildLocationQuery(item);
+}
+
+function buildLocationQuery(item) {
     const address = (item.Address || item.address || '').toString().trim();
     const suburb = (item.Suburb || item.suburb || '').toString().trim();
     return [address, suburb].filter(Boolean).join(', ');
@@ -711,6 +749,11 @@ function clearDetailMap() {
 }
 
 async function geocodeAddress(query) {
+    const cached = getCachedGeocode(query);
+    if (cached) {
+        return cached;
+    }
+
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
     const response = await fetch(url, {
         headers: {
@@ -735,11 +778,76 @@ async function geocodeAddress(query) {
         return null;
     }
 
-    return {
+    const geocode = {
         lat,
         lng,
         label: first.display_name || query
     };
+
+    setCachedGeocode(query, geocode);
+    return geocode;
+}
+
+function getCachedGeocode(query) {
+    if (!query) return null;
+
+    const cache = loadGeocodeCache();
+    const entry = cache[query];
+    if (!entry || typeof entry !== 'object') {
+        return null;
+    }
+
+    const isExpired = !Number.isFinite(entry.cachedAt) || (Date.now() - entry.cachedAt > GEOCODE_CACHE_TTL_MS);
+    if (isExpired) {
+        delete cache[query];
+        saveGeocodeCache(cache);
+        return null;
+    }
+
+    if (!Number.isFinite(entry.lat) || !Number.isFinite(entry.lng)) {
+        return null;
+    }
+
+    return {
+        lat: entry.lat,
+        lng: entry.lng,
+        label: entry.label || query
+    };
+}
+
+function setCachedGeocode(query, value) {
+    if (!query || !value) return;
+
+    const cache = loadGeocodeCache();
+    cache[query] = {
+        lat: value.lat,
+        lng: value.lng,
+        label: value.label,
+        cachedAt: Date.now()
+    };
+    saveGeocodeCache(cache);
+}
+
+function loadGeocodeCache() {
+    try {
+        const raw = localStorage.getItem(GEOCODE_CACHE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') {
+            return {};
+        }
+        return parsed;
+    } catch (error) {
+        return {};
+    }
+}
+
+function saveGeocodeCache(cache) {
+    try {
+        localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(cache));
+    } catch (error) {
+        // Ignore storage write failures.
+    }
 }
 
 function getUserLocation() {
@@ -859,6 +967,138 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function formatCurrencyAmount(amount) {
+    return Number(amount).toLocaleString('en-AU', {
+        maximumFractionDigits: 0
+    });
+}
+
+async function sha256Hex(value) {
+    if (!window.crypto || !window.crypto.subtle || typeof TextEncoder === 'undefined') {
+        throw new Error('Secure hash API is unavailable in this browser.');
+    }
+
+    const bytes = new TextEncoder().encode(String(value));
+    const buffer = await window.crypto.subtle.digest('SHA-256', bytes);
+    const view = new Uint8Array(buffer);
+    return Array.from(view)
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('');
+}
+
+function showAuthError(message) {
+    if (!dom.authError) return;
+
+    if (!message) {
+        dom.authError.textContent = '';
+        dom.authError.classList.add('hidden');
+        return;
+    }
+
+    dom.authError.textContent = message;
+    dom.authError.classList.remove('hidden');
+}
+
+function setAuthUnlocked(isUnlocked) {
+    if (isUnlocked) {
+        sessionStorage.setItem(AUTH_CONFIG.SESSION_KEY, '1');
+    } else {
+        sessionStorage.removeItem(AUTH_CONFIG.SESSION_KEY);
+    }
+}
+
+function isAuthUnlocked() {
+    return sessionStorage.getItem(AUTH_CONFIG.SESSION_KEY) === '1';
+}
+
+function lockApp() {
+    setAuthUnlocked(false);
+    updateAppState({
+        isAuthenticated: false,
+        selectedItem: null
+    });
+    closeAddCard();
+    clearDetailMap();
+
+    if (dom.appRoot) {
+        dom.appRoot.classList.add('hidden');
+    }
+
+    if (dom.authOverlay) {
+        dom.authOverlay.classList.remove('hidden');
+    }
+
+    if (dom.lockButton) {
+        dom.lockButton.classList.add('hidden');
+    }
+
+    showAuthError('');
+    if (dom.authPasswordInput) {
+        dom.authPasswordInput.value = '';
+        dom.authPasswordInput.focus();
+    }
+}
+
+function unlockApp() {
+    setAuthUnlocked(true);
+    updateAppState({ isAuthenticated: true });
+
+    if (dom.appRoot) {
+        dom.appRoot.classList.remove('hidden');
+    }
+
+    if (dom.authOverlay) {
+        dom.authOverlay.classList.add('hidden');
+    }
+
+    if (dom.lockButton) {
+        dom.lockButton.classList.remove('hidden');
+    }
+
+    showAuthError('');
+}
+
+async function handleAuthSubmit(event) {
+    event.preventDefault();
+    if (!dom.authPasswordInput) return;
+
+    const enteredValue = dom.authPasswordInput.value.trim();
+    if (!enteredValue) {
+        showAuthError('Enter password to continue.');
+        return;
+    }
+
+    try {
+        const enteredHash = await sha256Hex(enteredValue);
+        if (enteredHash !== AUTH_CONFIG.PASSWORD_HASH_SHA256) {
+            showAuthError('Incorrect password.');
+            return;
+        }
+
+        unlockApp();
+        fetchData();
+    } catch (error) {
+        showAuthError(error.message || 'Unable to verify password.');
+    }
+}
+
+async function initializeAuthState() {
+    if (isAuthUnlocked()) {
+        unlockApp();
+        await fetchData();
+        return;
+    }
+
+    lockApp();
+}
+
+function normalizeItem(item) {
+    return {
+        ...item,
+        _statusNormalized: normalizeStatus(item.Status)
+    };
 }
 
 function openAddCard() {
@@ -1109,6 +1349,10 @@ async function submitAddListing(event) {
  * Fetch data from API
  */
 async function fetchData() {
+    if (!appState.isAuthenticated) {
+        return;
+    }
+
     setLoadingState();
 
     try {
@@ -1125,7 +1369,7 @@ async function fetchData() {
             throw new Error('API response is not an array');
         }
 
-        setSuccessState(data);
+        setSuccessState(data.map((item) => normalizeItem(item)));
     } catch (err) {
         console.error('Fetch error:', err);
         setErrorState(`Error: ${err.message}`);
@@ -1218,6 +1462,14 @@ function setupEventListeners() {
         });
     }
 
+    if (dom.authForm) {
+        dom.authForm.addEventListener('submit', handleAuthSubmit);
+    }
+
+    if (dom.lockButton) {
+        dom.lockButton.addEventListener('click', lockApp);
+    }
+
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && appState.isAddCardOpen && !appState.isSubmittingAdd) {
             closeAddCard();
@@ -1235,7 +1487,7 @@ function setupEventListeners() {
 function init() {
     console.log('App initialized');
     setupEventListeners();
-    fetchData();
+    initializeAuthState();
 }
 
 // Start when DOM is ready
