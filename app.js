@@ -459,7 +459,11 @@ function renderSection(title, items, sectionClass) {
         const fieldsHtml = Object.entries(item)
             .filter(([key]) => {
                 const normalizedKey = key.toLowerCase();
-                return normalizedKey !== 'id' && normalizedKey !== 'address' && normalizedKey !== 'suburb' && normalizedKey !== 'url';
+                return !normalizedKey.startsWith('_')
+                    && normalizedKey !== 'id'
+                    && normalizedKey !== 'address'
+                    && normalizedKey !== 'suburb'
+                    && normalizedKey !== 'url';
             })
             .filter(([, value]) => value !== null && value !== undefined && value !== '')
             .map(([key, value]) => {
@@ -1132,6 +1136,10 @@ function openEditCard(item) {
     inspectTimes = (item.DateInspectTime || '').split(',').map((t) => t.trim()).filter(Boolean);
     renderInspectTimeList();
     document.getElementById('addStatus').value = item.Status || 'Inquired';
+    const agentEl = document.getElementById('addAgent');
+    if (agentEl) {
+        agentEl.value = item.Agent || item.agent || '';
+    }
     document.getElementById('addUrl').value = item.URL || item.Url || item.url || '';
     const noteEl = document.getElementById('addNote');
     if (noteEl) {
@@ -1178,6 +1186,7 @@ function buildAddListingPayload(formData) {
         PerWeek: String(formData.get('listingPerWeek') || '').trim(),
         DateInspectTime: String(formData.get('listingDateInspectTime') || '').trim(),
         Status: String(formData.get('listingStatus') || '').trim() || 'Planned Inspection',
+        Agent: String(formData.get('listingAgent') || '').trim(),
         URL: String(formData.get('listingUrl') || '').trim(),
         Note: String(formData.get('listingNote') || '').trim()
     };
