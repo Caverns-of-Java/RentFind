@@ -36,9 +36,6 @@
                 <h1 id="appTitle" style="cursor:pointer" title="Refresh">RentFind</h1>
                 <div class="header-controls" role="radiogroup" aria-label="View mode">
                 <a class="header-map-link" href="map.html" aria-label="Open inspection map">Map</a>
-                <button id="lockButton" type="button" class="filter-toggle hidden" aria-label="Lock app">
-                    <span>Lock</span>
-                </button>
                 <label class="filter-toggle" for="viewDefault">
                     <input id="viewDefault" type="radio" name="viewMode" value="default" checked>
                     <span>Default</span>
@@ -47,9 +44,9 @@
                     <input id="viewPlanned" type="radio" name="viewMode" value="planned">
                     <span>Only planned inspections</span>
                 </label>
-                <label class="filter-toggle" for="viewClosed">
-                    <input id="viewClosed" type="radio" name="viewMode" value="closed">
-                    <span>Only closed ones</span>
+                <label class="filter-toggle" for="viewArchive">
+                    <input id="viewArchive" type="radio" name="viewMode" value="archive">
+                    <span>Archive</span>
                 </label>
                 </div>
             </div>
@@ -157,6 +154,16 @@
                             <option value="Planned Inspection">Planned Inspection</option>
                             <option value="Applied">Applied</option>
                             <option value="Closed">Closed</option>
+                            <option value="Declined">Declined</option>
+                        </select>
+                    </label>
+                    <label class="add-card-field">
+                        <span>Type</span>
+                        <select id="addType" name="listingType" autocomplete="off">
+                            <option value="Unit" selected>Unit</option>
+                            <option value="House">House</option>
+                            <option value="Townhouse">Townhouse</option>
+                            <option value="Apartment">Apartment</option>
                         </select>
                     </label>
                     <label class="add-card-field">
@@ -168,7 +175,7 @@
                         <input id="addUrl" name="listingUrl" type="url" placeholder="https://..." autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
                     </label>
                     <label class="add-card-field">
-                        <span>Note</span>
+                        <span>Notes</span>
                         <textarea id="addNote" name="listingNote" rows="3" placeholder="Optional notes" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
                     </label>
                     <p id="addCardError" class="add-card-error hidden" role="alert"></p>
@@ -186,7 +193,7 @@
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js');
+                navigator.serviceWorker.register('./sw.js?v=16');
             });
         }
     </script>

@@ -50,7 +50,6 @@ const dom = {
     authForm: document.getElementById('authForm'),
     authPasswordInput: document.getElementById('authPasswordInput'),
     authError: document.getElementById('authError'),
-    lockButton: document.getElementById('lockButton'),
 
     // State regions
     statusRegion: document.querySelector('.status-region'),
@@ -227,9 +226,9 @@ function renderListView() {
         return;
     }
 
-    if (currentView === 'closed') {
-        const closedItems = [...visibleItems].sort((a, b) => getNumericId(b) - getNumericId(a));
-        renderSection('Closed', closedItems, 'closed-section');
+    if (currentView === 'archive') {
+        const archivedItems = [...visibleItems].sort((a, b) => getNumericId(b) - getNumericId(a));
+        renderSection('Archive', archivedItems, 'closed-section');
         return;
     }
 
@@ -301,11 +300,11 @@ function getVisibleItems() {
         return appState.items.filter((item) => isPlannedInspectionStatus(item));
     }
 
-    if (currentView === 'closed') {
-        return appState.items.filter((item) => isClosedStatus(item));
+    if (currentView === 'archive') {
+        return appState.items.filter((item) => isArchivedStatus(item));
     }
 
-    return appState.items.filter((item) => !isClosedStatus(item));
+    return appState.items.filter((item) => !isArchivedStatus(item));
 }
 
 function normalizeStatus(status) {
@@ -325,6 +324,11 @@ function getNormalizedStatus(input) {
 
 function isClosedStatus(status) {
     return getNormalizedStatus(status) === 'closed';
+}
+
+function isArchivedStatus(status) {
+    const normalized = getNormalizedStatus(status);
+    return normalized === 'closed' || normalized === 'declined';
 }
 
 function isPlannedInspectionStatus(status) {
@@ -1034,10 +1038,6 @@ function lockApp() {
         dom.authOverlay.classList.remove('hidden');
     }
 
-    if (dom.lockButton) {
-        dom.lockButton.classList.add('hidden');
-    }
-
     showAuthError('');
     if (dom.authPasswordInput) {
         dom.authPasswordInput.value = '';
@@ -1055,10 +1055,6 @@ function unlockApp() {
 
     if (dom.authOverlay) {
         dom.authOverlay.classList.add('hidden');
-    }
-
-    if (dom.lockButton) {
-        dom.lockButton.classList.remove('hidden');
     }
 
     showAuthError('');
@@ -1136,6 +1132,12 @@ function openEditCard(item) {
     inspectTimes = (item.DateInspectTime || '').split(',').map((t) => t.trim()).filter(Boolean);
     renderInspectTimeList();
     document.getElementById('addStatus').value = item.Status || 'Inquired';
+    const typeEl = document.getElementById('addType');
+    if (typeEl) {
+        const incomingType = String(item.Type || item.type || '').trim();
+        const validTypes = ['Unit', 'House', 'Townhouse', 'Apartment'];
+        typeEl.value = validTypes.includes(incomingType) ? incomingType : 'Unit';
+    }
     const agentEl = document.getElementById('addAgent');
     if (agentEl) {
         agentEl.value = item.Agent || item.agent || '';
@@ -1143,7 +1145,7 @@ function openEditCard(item) {
     document.getElementById('addUrl').value = item.URL || item.Url || item.url || '';
     const noteEl = document.getElementById('addNote');
     if (noteEl) {
-        noteEl.value = item.Note || '';
+        noteEl.value = item.Notes || item.Note || item.notes || item.note || '';
     }
     if (dom.addId) {
         dom.addId.value = itemId;
@@ -1186,8 +1188,10 @@ function buildAddListingPayload(formData) {
         PerWeek: String(formData.get('listingPerWeek') || '').trim(),
         DateInspectTime: String(formData.get('listingDateInspectTime') || '').trim(),
         Status: String(formData.get('listingStatus') || '').trim() || 'Planned Inspection',
+        Type: String(formData.get('listingType') || '').trim() || 'Unit',
         Agent: String(formData.get('listingAgent') || '').trim(),
         URL: String(formData.get('listingUrl') || '').trim(),
+        Notes: String(formData.get('listingNote') || '').trim(),
         Note: String(formData.get('listingNote') || '').trim()
     };
 
@@ -1218,6 +1222,11 @@ function validateAddListingPayload(payload) {
 
     if (payload.URL && !/^https?:\/\//i.test(payload.URL)) {
         return 'Listing URL must start with http:// or https://';
+    }
+
+    const validTypes = ['Unit', 'House', 'Townhouse', 'Apartment'];
+    if (!validTypes.includes(payload.Type)) {
+        return 'Type must be one of: Unit, House, Townhouse, Apartment.';
     }
 
     return null;
@@ -1473,10 +1482,6 @@ function setupEventListeners() {
 
     if (dom.authForm) {
         dom.authForm.addEventListener('submit', handleAuthSubmit);
-    }
-
-    if (dom.lockButton) {
-        dom.lockButton.addEventListener('click', lockApp);
     }
 
     document.addEventListener('keydown', (event) => {
