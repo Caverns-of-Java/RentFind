@@ -242,32 +242,20 @@ function renderListView() {
  */
 function buildUpcomingAndShortlistSections(items) {
     const now = new Date();
+    const weekAhead = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000));
     const sections = {
         next: [],
         shortlist: []
     };
 
-    let nextItem = null;
-    let nextTime = null;
-
     items.forEach((item) => {
         // Parse inspection time to find upcoming
         const inspectTime = getNextInspectionTime(item.DateInspectTime);
         if (inspectTime) {
-            if (inspectTime > now) {
-                // Keep one nearest future inspection in Upcoming section.
-                if (!nextTime || inspectTime < nextTime) {
-                    // Bump previous upcoming card to shortlist.
-                    if (nextItem) {
-                        sections.shortlist.push(nextItem);
-                    }
-                    nextItem = item;
-                    nextTime = inspectTime;
-                } else {
-                    sections.shortlist.push(item);
-                }
+            if (inspectTime > now && inspectTime <= weekAhead) {
+                sections.next.push(item);
             } else {
-                // Past inspection cards remain in shortlist.
+                // Past inspections and >7 day inspections remain in shortlist.
                 sections.shortlist.push(item);
             }
         } else {
@@ -275,9 +263,7 @@ function buildUpcomingAndShortlistSections(items) {
         }
     });
 
-    if (nextItem) {
-        sections.next.push(nextItem);
-    }
+    sections.next.sort((a, b) => compareShortlistItems(a, b));
 
     sections.shortlist.sort((a, b) => compareShortlistItems(a, b));
     return sections;
