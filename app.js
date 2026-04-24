@@ -1319,6 +1319,15 @@ async function submitAddListing(event) {
             throw new Error(`API error: ${response.status} ${response.statusText}`);
         }
 
+        const data = await response.json();
+        if (data && data.ok === false) {
+            updateAppState({
+                isSubmittingAdd: false,
+                addCardError: data.error || 'The listing could not be saved. Please check all required fields.'
+            });
+            return;
+        }
+
         if (isEditMode) {
             const editedId = String(payload.Id || payload.id);
             appState.items = appState.items.map((item) => {
