@@ -542,7 +542,7 @@ function renderDetailPanel() {
         dom.editDetailButton.classList.remove('hidden');
 
     const itemUrl = getItemUrl(item);
-    const mapUrl = getOpenStreetMapSearchUrl(item);
+    const mapUrl = getGoogleMapsSearchUrl(item);
 
     if (mapUrl) {
         dom.openMapButton.classList.remove('hidden');
@@ -710,6 +710,19 @@ function getItemUrl(item) {
     }
 
     return trimmedUrl;
+}
+
+/**
+ * Build Google Maps search URL from address and suburb fields.
+ */
+function getGoogleMapsSearchUrl(item) {
+    const query = buildLocationQuery(item);
+
+    if (!query) {
+        return '';
+    }
+
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
 /**
