@@ -232,6 +232,13 @@ function renderListView() {
         return;
     }
 
+    if (currentView === 'shortlistyes') {
+        const sections = buildUpcomingAndShortlistSections(visibleItems);
+        renderSection('Upcoming', sections.next, 'next-section');
+        renderSection('Shortlist-yes', sections.shortlist, 'upcoming-section');
+        return;
+    }
+
     const sections = buildUpcomingAndShortlistSections(visibleItems);
     renderSection('Upcoming', sections.next, 'next-section');
     renderSection('Shortlist', sections.shortlist, 'upcoming-section');
@@ -290,6 +297,10 @@ function getVisibleItems() {
         return appState.items.filter((item) => isArchivedStatus(item));
     }
 
+    if (currentView === 'shortlistyes') {
+        return appState.items.filter((item) => isShortlistYesStatus(item));
+    }
+
     return appState.items.filter((item) => !isArchivedStatus(item));
 }
 
@@ -319,6 +330,10 @@ function isArchivedStatus(status) {
 
 function isPlannedInspectionStatus(status) {
     return getNormalizedStatus(status) === 'planned inspection';
+}
+
+function isShortlistYesStatus(status) {
+    return getNormalizedStatus(status) === 'shortlist-yes';
 }
 
 /**
