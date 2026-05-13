@@ -333,7 +333,8 @@ function isPlannedInspectionStatus(status) {
 }
 
 function isShortlistYesStatus(status) {
-    return getNormalizedStatus(status) === 'shortlist-yes';
+    const normalized = getNormalizedStatus(status);
+    return normalized === 'shortlist-yes' || normalized === 'applied';
 }
 
 /**
